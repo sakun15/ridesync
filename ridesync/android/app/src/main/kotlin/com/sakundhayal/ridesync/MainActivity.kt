@@ -1,4 +1,4 @@
-package com.example.ridesync
+package com.sakundhayal.ridesync
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:11851811598:android:5378a30f7aa737880d655f",
+        "mobilesdk_app_id": "1:11851811598:android:388230169784dcc80d655f",
         "android_client_info": {
-          "package_name": "com.example.ridesync"
+          "package_name": "com.sakundhayal.ridesync"
         }
       },
       "oauth_client": [],
