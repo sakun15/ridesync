@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "11851811598",
+    "project_id": "ridesync-460a2",
+    "storage_bucket": "ridesync-460a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:11851811598:android:5378a30f7aa737880d655f",
+        "android_client_info": {
+          "package_name": "com.example.ridesync"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoSi6UuSayxmGixYEvBsnGwOy7BOikJ74"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
