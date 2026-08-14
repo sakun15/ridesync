@@ -15,3 +15,11 @@ permission_handler major version.
 
 
 commented # permission_handler: ^13.0.0   # re-add in Phase 3 (location permissions)
+
+
+## Deferred from Phase 0
+- Blaze plan upgrade → needed before Phase 3 (Maps SDK) and Phase 5 (Cloud Functions)
+- Budget alert in Google Cloud Console → set at same time as Blaze, BEFORE writing 
+  any location-update code
+- Physical Android device → required from Phase 4 (emulator sensors are useless for 
+  crash detection)
