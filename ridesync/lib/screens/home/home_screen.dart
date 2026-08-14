@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/trip_model.dart';
 import '../../state/auth_provider.dart';
+import '../../state/trip_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -11,6 +15,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final user = ref.watch(authStateProvider).value;
+    final tripsAsync = ref.watch(activeTripsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -23,77 +28,157 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            Text(
-              'Signed in as',
-              style: textTheme.labelSmall,
-            ),
-            const SizedBox(height: AppSpacing.xs),
             Text(
               user?.displayName ?? 'Rider',
               style: textTheme.headlineSmall,
             ),
-            Text(
-              user?.email ?? '',
-              style: textTheme.bodyMedium,
-            ),
             const SizedBox(height: AppSpacing.xl),
 
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.slate,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: AppColors.border),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push(AppRoutes.createTrip),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('New trip'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(AppRoutes.joinTrip),
+                    icon: const Icon(Icons.group_add_outlined, size: 18),
+                    label: const Text('Join'),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+            Text('Active trips', style: textTheme.labelSmall),
+            const SizedBox(height: AppSpacing.sm),
+
+            tripsAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                child: Center(child: CircularProgressIndicator()),
               ),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                child: Text(
+                  'Could not load your trips. Check your connection.',
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: AppColors.warning),
+                ),
+              ),
+              data: (trips) {
+                if (trips.isEmpty) return const _EmptyTrips();
+                return Column(
+                  children: trips
+                      .map((t) => Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: _TripCard(trip: t),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TripCard extends StatelessWidget {
+  const _TripCard({required this.trip});
+
+  final Trip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: () => context.push('${AppRoutes.trip}/${trip.tripId}'),
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.slate,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: AppColors.signal,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.construction_outlined,
-                        size: 18,
-                        color: AppColors.ash,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text('Phase 1 complete', style: textTheme.titleSmall),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Authentication, routing, and theming are working. '
-                    'Trips and the live map come next.',
+                    trip.name,
+                    style: textTheme.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${trip.memberIds.length} '
+                    '${trip.memberIds.length == 1 ? "person" : "people"}'
+                    '  ·  ${trip.inviteCode}',
                     style: textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
-
-            const Spacer(),
-
-            // Verifies the emergency style renders correctly. Wired up properly
-            // in Phase 5 — for now it does nothing.
-            ElevatedButton.icon(
-              style: AppTheme.emergencyButtonStyle(context),
-              onPressed: null,
-              icon: const Icon(Icons.sos_outlined),
-              label: const Text('SOS'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Center(
-              child: Text(
-                'Not active until Phase 5',
-                style: textTheme.bodySmall,
-              ),
-            ),
+            const Icon(Icons.chevron_right, size: 20, color: AppColors.ash),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyTrips extends StatelessWidget {
+  const _EmptyTrips();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.slate,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.route_outlined, size: 28, color: AppColors.ash),
+          const SizedBox(height: AppSpacing.sm),
+          Text('No active trips', style: textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Start a trip or join one with a code.',
+            style: textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
