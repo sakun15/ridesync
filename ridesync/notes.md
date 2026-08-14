@@ -23,3 +23,9 @@ commented # permission_handler: ^13.0.0   # re-add in Phase 3 (location permissi
   any location-update code
 - Physical Android device → required from Phase 4 (emulator sensors are useless for 
   crash detection)
+
+  ## Firestore rules
+Live rules are in the Firebase console. `firestore.rules` in the repo is a 
+versioned copy — keep both in sync manually when changing rules.
+Consider Firebase CLI (`firebase deploy --only firestore:rules`) later to 
+remove the manual step.

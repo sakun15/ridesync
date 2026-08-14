@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user's profile. Readable by any signed-in user (trip members need to
+    // see each other's names), writable only by the owner.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.uid == userId;
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.uid == userId;
+      allow delete: if false;
+
+      // Emergency contacts are private to the owner. No exceptions — these
+      // include other people's phone numbers.
+      match /emergency_contacts/{contactId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Everything else stays denied until its phase adds explicit rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
