@@ -8,6 +8,9 @@ import '../../screens/home/home_screen.dart';
 import '../../screens/onboarding/onboarding_screen.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../state/auth_provider.dart';
+import '../../screens/trip/active_trip/active_trip_screen.dart';
+import '../../screens/trip/create_trip/create_trip_screen.dart';
+import '../../screens/trip/join_trip/join_trip_screen.dart';
 
 /// Route paths in one place so typos become compile errors, not runtime ones.
 abstract final class AppRoutes {
@@ -16,6 +19,9 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const signup = '/signup';
   static const home = '/home';
+  static const createTrip = '/trip/create';
+  static const joinTrip = '/trip/join';
+  static const trip = '/trip';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -70,6 +76,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.createTrip,
+        builder: (context, state) => const CreateTripScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.joinTrip,
+        builder: (context, state) => const JoinTripScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.trip}/:tripId',
+        builder: (context, state) => ActiveTripScreen(
+          tripId: state.pathParameters['tripId']!,
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
