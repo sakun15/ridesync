@@ -5,20 +5,61 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/location_model.dart';
 import '../../../models/trip_member_model.dart';
 import '../../../models/trip_model.dart';
+import '../../../services/location_service.dart';
 import '../../../services/trip_service.dart';
 import '../../../state/auth_provider.dart';
+import '../../../state/location_provider.dart';
 import '../../../state/trip_provider.dart';
+import 'widgets/location_permission_gate.dart';
+import 'widgets/member_location_tile.dart';
 
-class ActiveTripScreen extends ConsumerWidget {
+class ActiveTripScreen extends ConsumerStatefulWidget {
   const ActiveTripScreen({required this.tripId, super.key});
 
   final String tripId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tripAsync = ref.watch(tripProvider(tripId));
+  ConsumerState<ActiveTripScreen> createState() => _ActiveTripScreenState();
+}
+
+class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Deferred because startTracking touches providers, and modifying provider
+    // state during the first build throws.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startTracking());
+  }
+
+  @override
+  void dispose() {
+    // Deliberately NOT stopping tracking here.
+    //
+    // dispose() fires when this screen is popped — including when the user
+    // taps into settings or a member's details. Stopping here would silently
+    // end location sharing every time they navigated away, which is exactly
+    // the moment it matters most. Tracking is stopped explicitly on leave/end
+    // instead.
+    super.dispose();
+  }
+
+  Future<void> _startTracking() async {
+    final user = ref.read(authStateProvider).value;
+    if (user == null) return;
+
+    final service = ref.read(locationServiceProvider);
+    final permission = await service.checkPermission();
+    if (permission != LocationPermissionState.granted) return;
+
+    await service.startTracking(tripId: widget.tripId, uid: user.uid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tripAsync = ref.watch(tripProvider(widget.tripId));
     final user = ref.watch(authStateProvider).value;
 
     return Scaffold(
@@ -31,7 +72,7 @@ class ActiveTripScreen extends ConsumerWidget {
       ),
       body: tripAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const _ErrorState(
+        error: (_, _) => const _ErrorState(
           message: 'Could not load this trip.',
         ),
         data: (trip) {
@@ -41,7 +82,7 @@ class ActiveTripScreen extends ConsumerWidget {
           if (!trip.isActive) {
             return const _ErrorState(message: 'This trip has ended.');
           }
-          return _TripBody(trip: trip);
+          return LocationPermissionGate(child: _TripBody(trip: trip));
         },
       ),
     );
@@ -57,12 +98,22 @@ class _TripBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final membersAsync = ref.watch(tripMembersProvider(trip.tripId));
+    final locationsAsync = ref.watch(tripLocationsProvider(trip.tripId));
     final currentUid = ref.watch(authStateProvider).value?.uid;
+
+    // Keyed by uid so each member tile can find its own location in O(1)
+    // rather than scanning the list.
+    final locations = <String, LiveLocation>{
+      for (final l in locationsAsync.value ?? const <LiveLocation>[])
+        l.uid: l,
+    };
+
+    final myLocation = currentUid == null ? null : locations[currentUid];
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        _InviteCodeCard(code: trip.inviteCode, tripName: trip.name),
+        _InviteCodeCard(code: trip.inviteCode),
 
         if (trip.description != null && trip.description!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
@@ -78,35 +129,63 @@ class _TripBody extends ConsumerWidget {
             padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (_, __) => Text(
+          error: (_, _) => Text(
             'Could not load members.',
             style: textTheme.bodySmall?.copyWith(color: AppColors.warning),
           ),
-          data: (members) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${members.length} ${members.length == 1 ? "person" : "people"}',
-                style: textTheme.labelSmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ...members.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _MemberTile(
-                    member: m,
-                    isCurrentUser: m.uid == currentUid,
-                  ),
+          data: (members) {
+            // Moving members first, then stopped, then offline. On a group
+            // ride you care most about who's actually moving.
+            final sorted = [...members]..sort((a, b) {
+                int rank(TripMember m) {
+                  final state = locations[m.uid]?.effectiveState;
+                  return switch (state) {
+                    MovementState.moving => 0,
+                    MovementState.stopped => 1,
+                    MovementState.offline => 2,
+                    null => 3,
+                  };
+                }
+                return rank(a).compareTo(rank(b));
+              });
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${members.length} ${members.length == 1 ? "person" : "people"}',
+                  style: textTheme.labelSmall,
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(height: AppSpacing.sm),
+                ...sorted.map((m) {
+                  final memberLocation = locations[m.uid];
+                  double? distance;
+                  if (myLocation != null &&
+                      memberLocation != null &&
+                      m.uid != currentUid) {
+                    distance = LocationService.distanceBetween(
+                      myLocation,
+                      memberLocation,
+                    );
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: MemberLocationTile(
+                      member: m,
+                      isCurrentUser: m.uid == currentUid,
+                      location: memberLocation,
+                      distanceMeters: distance,
+                    ),
+                  );
+                }),
+              ],
+            );
+          },
         ),
 
         const SizedBox(height: AppSpacing.xl),
 
-        // Placeholder for Phase 3. Stated plainly rather than showing a
-        // disabled map that looks broken.
         Container(
           padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
@@ -118,10 +197,10 @@ class _TripBody extends ConsumerWidget {
             children: [
               const Icon(Icons.map_outlined, size: 28, color: AppColors.ash),
               const SizedBox(height: AppSpacing.sm),
-              Text('Live map coming in Phase 3', style: textTheme.titleSmall),
+              Text('Map coming next', style: textTheme.titleSmall),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Location sharing is not active yet.',
+                'Location data is live — the map view is being added.',
                 style: textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
@@ -134,10 +213,9 @@ class _TripBody extends ConsumerWidget {
 }
 
 class _InviteCodeCard extends StatelessWidget {
-  const _InviteCodeCard({required this.code, required this.tripName});
+  const _InviteCodeCard({required this.code});
 
   final String code;
-  final String tripName;
 
   @override
   Widget build(BuildContext context) {
@@ -155,10 +233,7 @@ class _InviteCodeCard extends StatelessWidget {
         children: [
           Text('Invite code', style: textTheme.labelSmall),
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            code,
-            style: textTheme.displayMedium?.copyWith(letterSpacing: 8),
-          ),
+          Text(code, style: textTheme.displayMedium?.copyWith(letterSpacing: 8)),
           const SizedBox(height: AppSpacing.md),
           OutlinedButton.icon(
             onPressed: () async {
@@ -172,70 +247,6 @@ class _InviteCodeCard extends StatelessWidget {
             icon: const Icon(Icons.copy, size: 18),
             label: const Text('Copy code'),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.member, required this.isCurrentUser});
-
-  final TripMember member;
-  final bool isCurrentUser;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.slate,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.graphite,
-            backgroundImage: member.photoUrl != null
-                ? NetworkImage(member.photoUrl!)
-                : null,
-            child: member.photoUrl == null
-                ? Text(
-                    member.displayName.characters.first.toUpperCase(),
-                    style: textTheme.titleMedium,
-                  )
-                : null,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        member.displayName,
-                        style: textTheme.titleMedium,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isCurrentUser) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      Text('You', style: textTheme.bodySmall),
-                    ],
-                  ],
-                ),
-                if (member.isOwner)
-                  Text('Created this trip', style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-          // Location status lands here in Phase 3.
         ],
       ),
     );
@@ -277,9 +288,21 @@ class _TripMenu extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
 
     try {
+      // Stop broadcasting BEFORE the membership change. Once the security
+      // rules no longer recognise us as a member, our writes would start
+      // failing — and a stream retrying failed writes forever is worse than
+      // one that stopped cleanly.
+      final locationService = ref.read(locationServiceProvider);
+      await locationService.stopTracking();
+
+      try {
+        await locationService.clearLocation(tripId: trip.tripId, uid: uid);
+      } catch (_) {}
+
       await action();
       if (context.mounted) context.go(AppRoutes.home);
     } on TripException catch (e) {
+
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
