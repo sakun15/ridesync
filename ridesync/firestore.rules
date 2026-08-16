@@ -85,9 +85,29 @@ service cloud.firestore {
         allow write: if isSignedIn() && request.auth.uid == memberId;
       }
     }
+    }
 
+    // Live location. The most sensitive data in the app.
+    //
+    // Document ID is "{tripId}_{uid}" so both the trip and the owner are
+    // derivable from the ID itself — no read of the document needed to decide
+    // whether you may read it.
+    match /live_locations/{locationId} {
+      allow read: if isSignedIn() && isTripMember(resource.data.tripId);
+
+      // Three conditions, each closing a different hole: you can't claim to be
+      // someone else, the document ID must match its contents, and you must
+      // actually be in the trip.
+      allow create, update: if isSignedIn()
+                           && request.resource.data.uid == request.auth.uid
+                           && locationId == request.resource.data.tripId
+                                            + '_' + request.auth.uid
+                           && isTripMember(request.resource.data.tripId);
+
+      allow delete: if isSignedIn()
+                    && resource.data.uid == request.auth.uid;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
   }
-}

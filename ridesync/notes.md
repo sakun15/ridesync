@@ -68,3 +68,24 @@ End of Phase 2	Membership code is written. Cheapest time to fix.
 End of Phase 3	⚠️ The critical one. This is when location data starts flowing through these rules. A drift bug goes from "annoying" to "privacy breach" at this exact moment.
 End of Phase 5	Emergency alerts read the member list to decide who gets notified.
 Phase 7	Full security audit anyway.
+
+
+
+## permission_handler resolution (2026-08-15)
+v13/v14 fails: permission_handler_android 14.0.0 uses newer Kotlin DSL 
+(`kotlin { compilerOptions { } }`) that our Gradle setup doesn't resolve.
+Pinned to ^11.3.1 (resolves 11.4.0) — builds clean.
+Revisit when the package ships a fix; not urgent, v11 works.
+
+## Silence escalation (design, for Phase 5)
+Silence alone is weak evidence — never auto-escalate to emergency contacts.
+Stages: 2min grey out → 5min group passive notice → 15min prominent group 
+alert → 30min offer (not auto) to notify emergency contacts.
+Group escalates before external contacts: they're on the same road.
+Battery level at last write disambiguates dead phone vs healthy phone.
+EXCEPTION: silence following a high-confidence crash signal is corroboration, 
+not ambiguity. Different path entirely.
+
+SHA1: 15:1E:17:0F:8E:E8:4E:61:4D:4F:F6:2F:A8:0D:3D:6F:3D:F4:CD:F0
+
+Worth noting: your release variant shows the same SHA-1, because it's currently signed with the debug keystore. That's fine for development — but when you eventually publish, you'll create a real release keystore with a different fingerprint, and that one needs registering too. Add it to notes.md as a pre-release task.
