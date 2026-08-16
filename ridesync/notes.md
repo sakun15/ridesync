@@ -85,3 +85,7 @@ Group escalates before external contacts: they're on the same road.
 Battery level at last write disambiguates dead phone vs healthy phone.
 EXCEPTION: silence following a high-confidence crash signal is corroboration, 
 not ambiguity. Different path entirely.
+
+SHA1: 15:1E:17:0F:8E:E8:4E:61:4D:4F:F6:2F:A8:0D:3D:6F:3D:F4:CD:F0
+
+Worth noting: your release variant shows the same SHA-1, because it's currently signed with the debug keystore. That's fine for development — but when you eventually publish, you'll create a real release keystore with a different fingerprint, and that one needs registering too. Add it to notes.md as a pre-release task.

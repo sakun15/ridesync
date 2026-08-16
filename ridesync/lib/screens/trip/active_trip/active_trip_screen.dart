@@ -15,6 +15,7 @@ import '../../../state/location_provider.dart';
 import '../../../state/trip_provider.dart';
 import 'widgets/location_permission_gate.dart';
 import 'widgets/member_location_tile.dart';
+import 'widgets/trip_map.dart';
 
 class ActiveTripScreen extends ConsumerStatefulWidget {
   const ActiveTripScreen({required this.tripId, super.key});
@@ -113,6 +114,15 @@ class _TripBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        // The map goes first — it's the reason people open this screen.
+        TripMap(
+          members: membersAsync.value ?? const [],
+          locations: locations,
+          currentUid: currentUid,
+        ),
+
+        const SizedBox(height: AppSpacing.lg),
+
         _InviteCodeCard(code: trip.inviteCode),
 
         if (trip.description != null && trip.description!.isNotEmpty) ...[
@@ -146,6 +156,7 @@ class _TripBody extends ConsumerWidget {
                     null => 3,
                   };
                 }
+
                 return rank(a).compareTo(rank(b));
               });
 
@@ -182,30 +193,6 @@ class _TripBody extends ConsumerWidget {
               ],
             );
           },
-        ),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: AppColors.slate,
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              const Icon(Icons.map_outlined, size: 28, color: AppColors.ash),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Map coming next', style: textTheme.titleSmall),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Location data is live — the map view is being added.',
-                style: textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -295,6 +282,8 @@ class _TripMenu extends ConsumerWidget {
       final locationService = ref.read(locationServiceProvider);
       await locationService.stopTracking();
 
+      // Best-effort cleanup. If this fails, the document just goes stale and
+      // is treated as offline — not a reason to block ending the trip.
       try {
         await locationService.clearLocation(tripId: trip.tripId, uid: uid);
       } catch (_) {}
@@ -302,7 +291,6 @@ class _TripMenu extends ConsumerWidget {
       await action();
       if (context.mounted) context.go(AppRoutes.home);
     } on TripException catch (e) {
-
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.message)));
@@ -367,7 +355,8 @@ class _ErrorState extends StatelessWidget {
           children: [
             const Icon(Icons.info_outline, size: 32, color: AppColors.ash),
             const SizedBox(height: AppSpacing.md),
-            Text(message, style: textTheme.bodyMedium, textAlign: TextAlign.center),
+            Text(message,
+                style: textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.lg),
             OutlinedButton(
               onPressed: () => context.go(AppRoutes.home),
