@@ -177,6 +177,7 @@ class _TripMapState extends State<TripMap> {
                 zoom: 14,
               ),
               markers: _buildMarkers(),
+               style: _darkMapStyle,
               myLocationEnabled: false, // our own marker already shows this
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
@@ -184,7 +185,6 @@ class _TripMapState extends State<TripMap> {
               compassEnabled: true,
               onMapCreated: (controller) {
                 _controller = controller;
-                _controller!.setMapStyle(_darkMapStyle);
                 if (!_hasDoneInitialFit) {
                   _hasDoneInitialFit = true;
                   // Delayed so the map has laid out before we animate.

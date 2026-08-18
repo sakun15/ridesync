@@ -16,6 +16,7 @@ import '../../../state/trip_provider.dart';
 import 'widgets/location_permission_gate.dart';
 import 'widgets/member_location_tile.dart';
 import 'widgets/trip_map.dart';
+import 'widgets/recorder_panel.dart';
 
 class ActiveTripScreen extends ConsumerStatefulWidget {
   const ActiveTripScreen({required this.tripId, super.key});
@@ -194,6 +195,10 @@ class _TripBody extends ConsumerWidget {
             );
           },
         ),
+        const SizedBox(height: AppSpacing.xl),
+
+        // DEVELOPMENT ONLY — remove before release. See notes.md.
+        const RecorderPanel(),
       ],
     );
   }
